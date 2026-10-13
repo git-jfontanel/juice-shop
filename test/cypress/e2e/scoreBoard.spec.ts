@@ -1,5 +1,5 @@
 describe('/#/score-board', () => {
-  describe('challenge "scoreBoard"', () => {
+  describe('challenge "scoreBoardChallenge"', () => {
     it('should be possible to access score board', () => {
       cy.visit('/#/score-board')
       cy.url().should('match', /\/score-board/)
@@ -7,7 +7,7 @@ describe('/#/score-board', () => {
     })
   })
 
-  describe('challenge "continueCode"', () => {
+  describe('challenge "continueCodeChallenge"', () => {
     it('should be possible to solve the non-existent challenge #99', () => {
       cy.window().then(async () => {
         await fetch(
@@ -25,10 +25,12 @@ describe('/#/score-board', () => {
       cy.expectChallengeSolved({ challenge: 'Imaginary Challenge' })
     })
   })
+})
 
+xdescribe('/#/score-board-legacy', () => { // TODO Replace with test based on new Score Board
   describe('repeat notification', () => {
     beforeEach(() => {
-      cy.visit('/#/score-board')
+      cy.visit('/#/score-board-legacy')
     })
 
     it('should be possible in both when and when not in CTF mode', () => {

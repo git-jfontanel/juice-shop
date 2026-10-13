@@ -5,7 +5,7 @@ describe('/#/administration', () => {
       password: 'admin123'
     })
   })
-  describe('challenge "adminSection"', () => {
+  describe('challenge "adminSectionChallenge"', () => {
     it('should be possible to access administration section with admin user', () => {
       cy.visit('/#/administration')
       cy.url().should('match', /\/administration/)
@@ -14,11 +14,11 @@ describe('/#/administration', () => {
     })
   })
 
-  describe('challenge "fiveStarFeedback"', () => {
+  describe('challenge "feedbackChallenge"', () => {
     it('should be possible for any admin user to delete feedback', () => {
       cy.visit('/#/administration')
       cy.wait(1000)
-      cy.get('.mat-cell.mat-column-remove > button').first().click()
+      cy.get('.mat-mdc-cell.mat-column-remove > button').first().click()
       cy.expectChallengeSolved({ challenge: 'Five-Star Feedback' })
     })
   })

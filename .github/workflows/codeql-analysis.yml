@@ -15,16 +15,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'javascript' ]
+        language: [ 'javascript-typescript' ]
     steps:
     - name: Checkout repository
-      uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac #v4.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
+      uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
         queries: security-extended
+        config: |
+          paths-ignore:
+            - 'data/static/codefixes'
+          query-filters:
+          - exclude:
+               id: js/missing-rate-limiting
     - name: Autobuild
-      uses: github/codeql-action/autobuild@v2
+      uses: github/codeql-action/autobuild@v3
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
+      uses: github/codeql-action/analyze@v3

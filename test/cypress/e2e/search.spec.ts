@@ -4,11 +4,11 @@ describe('/#/search', () => {
   beforeEach(() => {
     cy.visit('/#/search')
   })
-  describe('challenge "localXss"', () => {
+  describe('challenge "localXssChallenge"', () => {
     // Cypress alert bug
     xit('search query should be susceptible to reflected XSS attacks', () => {
       cy.get('#searchQuery').click()
-      cy.get('#mat-input-0')
+      cy.get('app-mat-search-bar input')
         .type('<iframe src="javascript:alert(`xss`)">')
         .type('{enter}')
       cy.on('window:alert', (t) => {
@@ -17,10 +17,10 @@ describe('/#/search', () => {
       cy.expectChallengeSolved({ challenge: 'DOM XSS' })
     })
   })
-  describe('challenge "xssBonusPayload"', () => {
+  describe('challenge "xssBonusChallenge"', () => {
     it('search query should be susceptible to reflected XSS attacks', () => {
       cy.get('#searchQuery').click()
-      cy.get('#mat-input-0')
+      cy.get('app-mat-search-bar input')
         .type(
           '<iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/771984076&color=%23ff5500&auto_play=true&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true"></iframe>'
         )
@@ -31,7 +31,7 @@ describe('/#/search', () => {
 })
 
 describe('/rest/products/search', () => {
-  describe('challenge "unionSqlInjection"', () => {
+  describe('challenge "unionSqlInjectionChallenge"', () => {
     it('query param in product search endpoint should be susceptible to UNION SQL injection attacks', () => {
       cy.request(
         "/rest/products/search?q=')) union select id,'2','3',email,password,'6','7','8','9' from users--"
@@ -40,7 +40,7 @@ describe('/rest/products/search', () => {
     })
   })
 
-  describe('challenge "dbSchema"', () => {
+  describe('challenge "dbSchemaChallenge"', () => {
     it('query param in product search endpoint should be susceptible to UNION SQL injection attacks', () => {
       cy.request(
         "/rest/products/search?q=')) union select sql,'2','3','4','5','6','7','8','9' from sqlite_master--"
@@ -76,7 +76,7 @@ describe('/rest/products/search', () => {
     })
   })
 
-  xdescribe('challenge "christmasSpecial"', () => {
+  xdescribe('challenge "christmasSpecialChallenge"', () => {
     beforeEach(() => {
       cy.login({
         email: 'admin',

@@ -1,16 +1,18 @@
 /*
- * Copyright (c) 2014-2023 Bjoern Kimminich & the OWASP Juice Shop contributors.
+ * Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.
  * SPDX-License-Identifier: MIT
  */
 
-import fs = require('fs')
+import fs from 'node:fs'
 import config from 'config'
 import * as utils from '../utils'
-const replace = require('replace')
+// @ts-expect-error FIXME due to non-existing type definitions for replace
+import replace from 'replace'
 
-const customizeApplication = () => {
-  if (config.get('application.name')) {
+const customizeApplication = async () => {
+  if (config.get<string>('application.name')) {
     customizeTitle()
+    customizeTerraformFiles()
   }
   if (config.get('application.logo')) {
     void customizeLogo()
@@ -80,7 +82,7 @@ const retrieveCustomFile = async (sourceProperty: string, destinationFolder: str
 }
 
 const customizeTitle = () => {
-  const title = `<title>${config.get('application.name')}</title>`
+  const title = `<title>${config.get<string>('application.name')}</title>`
   replace({
     regex: /<title>.*<\/title>/,
     replacement: title,
@@ -91,9 +93,9 @@ const customizeTitle = () => {
 }
 
 const customizeTheme = () => {
-  const bodyClass = '"mat-app-background ' + config.get('application.theme') + '-theme"'
+  const bodyClass = '"' + config.get<string>('application.theme') + '-theme"'
   replace({
-    regex: /"mat-app-background .*-theme"/,
+    regex: /".*-theme"/,
     replacement: bodyClass,
     paths: ['frontend/dist/frontend/index.html'],
     recursive: false,
@@ -102,7 +104,7 @@ const customizeTheme = () => {
 }
 
 const customizeCookieConsentBanner = () => {
-  const contentProperty = '"content": { "message": "' + config.get('application.cookieConsent.message') + '", "dismiss": "' + config.get('application.cookieConsent.dismissText') + '", "link": "' + config.get('application.cookieConsent.linkText') + '", "href": "' + config.get('application.cookieConsent.linkUrl') + '" }'
+  const contentProperty = '"content": { "message": "' + config.get<string>('application.cookieConsent.message') + '", "dismiss": "' + config.get<string>('application.cookieConsent.dismissText') + '", "link": "' + config.get<string>('application.cookieConsent.linkText') + '", "href": "' + config.get<string>('application.cookieConsent.linkUrl') + '" }'
   replace({
     regex: /"content": { "message": ".*", "dismiss": ".*", "link": ".*", "href": ".*" }/,
     replacement: contentProperty,
@@ -112,4 +114,30 @@ const customizeCookieConsentBanner = () => {
   })
 }
 
-module.exports = customizeApplication
+const slugify = (name: string) => {
+  return name.toLowerCase().replace(/[^\w]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+const customizeTerraformFiles = () => {
+  const appName = config.get<string>('application.name')
+  if (appName !== 'OWASP Juice Shop') {
+    const slugName = slugify(appName)
+    const snakeName = slugName.replace(/-/g, '_')
+    replace({
+      regex: /juice-shop/g,
+      replacement: slugName,
+      paths: ['terraform'],
+      recursive: true,
+      silent: true
+    })
+    replace({
+      regex: /juice_shop/g,
+      replacement: snakeName,
+      paths: ['terraform'],
+      recursive: true,
+      silent: true
+    })
+  }
+}
+
+export default customizeApplication

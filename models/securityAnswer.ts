@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2014-2023 Bjoern Kimminich & the OWASP Juice Shop contributors.
+ * Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.
  * SPDX-License-Identifier: MIT
  */
 
-/* jslint node: true */
 import {
   Model,
   type InferAttributes,
@@ -12,7 +11,7 @@ import {
   type CreationOptional,
   type Sequelize
 } from 'sequelize'
-const security = require('../lib/insecurity')
+import * as security from '../lib/insecurity'
 
 class SecurityAnswer extends Model<
 InferAttributes<SecurityAnswer>,
@@ -42,7 +41,7 @@ const SecurityAnswerModelInit = (sequelize: Sequelize) => {
       },
       answer: {
         type: DataTypes.STRING,
-        set (answer) {
+        set (answer: string) {
           this.setDataValue('answer', security.hmac(answer))
         }
       }

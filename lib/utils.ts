@@ -1,66 +1,49 @@
 /*
- * Copyright (c) 2014-2023 Bjoern Kimminich & the OWASP Juice Shop contributors.
+ * Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.
  * SPDX-License-Identifier: MIT
  */
 
-/* jslint node: true */
 import packageJson from '../package.json'
-import fs from 'fs'
+import fs from 'node:fs'
 import logger from './logger'
 import config from 'config'
-import jsSHA from 'jssha'
 import download from 'download'
-import crypto from 'crypto'
+import crypto from 'node:crypto'
 import clarinet from 'clarinet'
+import type { Challenge } from '@juice-shop/data/types'
 
+import isHeroku from './is-heroku'
 import isDocker from './is-docker'
 import isWindows from './is-windows'
-import isHeroku from './is-heroku'
-// import isGitpod from 'is-gitpod') // FIXME Roll back to this when https://github.com/dword-design/is-gitpod/issues/94 is resolve
-const isGitpod = () => false
+export { default as isDocker } from './is-docker'
+export { default as isWindows } from './is-windows'
 
 const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 
-export const queryResultToJson = (data: any, status: string = 'success') => {
-  let wrappedData: any = {}
-  if (data) {
-    if (!data.length && data.dataValues) {
-      wrappedData = data.dataValues
-    } else if (data.length > 0) {
-      wrappedData = []
-      for (let i = 0; i < data.length; i++) {
-        wrappedData.push(data[i]?.dataValues ? data[i].dataValues : data[i])
-      }
-    } else {
-      wrappedData = data
-    }
-  }
+export const queryResultToJson = <T>(
+  data: T,
+  status: string = 'success'
+): { data: T, status: string } => {
   return {
     status,
-    data: wrappedData
+    data
   }
 }
 
 export const isUrl = (url: string) => {
-  return startsWith(url, 'http')
+  return url.startsWith('http')
 }
 
-export const startsWith = (str: string, prefix: string) => str ? str.indexOf(prefix) === 0 : false
-
-export const endsWith = (str?: string, suffix?: string) => (str && suffix) ? str.includes(suffix, str.length - suffix.length) : false
-
-export const contains = (str: string, element: string) => str ? str.includes(element) : false // TODO Inline all usages as this function is not adding any functionality to String.includes
-
 export const containsEscaped = function (str: string, element: string) {
-  return contains(str, element.replace(/"/g, '\\"'))
+  return str ? str.includes(element.replace(/"/g, '\\"')) : false
 }
 
 export const containsOrEscaped = function (str: string, element: string) {
-  return contains(str, element) || containsEscaped(str, element)
+  return (str ? str.includes(element) : false) || containsEscaped(str, element)
 }
 
 export const unquote = function (str: string) {
-  if (str && startsWith(str, '"') && endsWith(str, '"')) {
+  if (str && str.startsWith('"') && str.endsWith('"')) {
     return str.substring(1, str.length - 1)
   } else {
     return str
@@ -94,10 +77,7 @@ const getCtfKey = () => {
   return cachedCtfKey
 }
 export const ctfFlag = (text: string) => {
-  const shaObj = new jsSHA('SHA-1', 'TEXT') // eslint-disable-line new-cap
-  shaObj.setHMACKey(getCtfKey(), 'TEXT')
-  shaObj.update(text)
-  return shaObj.getHMAC('HEX')
+  return crypto.createHmac('sha1', getCtfKey()).update(text).digest('hex')
 }
 
 export const toMMMYY = (date: Date) => {
@@ -119,7 +99,7 @@ export const toISO8601 = (date: Date) => {
 
 export const extractFilename = (url: string) => {
   let file = decodeURIComponent(url.substring(url.lastIndexOf('/') + 1))
-  if (contains(file, '?')) {
+  if (file ? file.includes('?') : false) {
     file = file.substring(0, file.indexOf('?'))
   }
   return file
@@ -149,29 +129,52 @@ export const jwtFrom = ({ headers }: { headers: any }) => {
   return undefined
 }
 
-export const randomHexString = (length: number) => {
+export const randomHexString = (length: number): string => {
   return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length)
 }
 
-export const disableOnContainerEnv = () => {
-  return (isDocker() || isGitpod() || isHeroku()) && !config.get('challenges.safetyOverride')
+export interface ChallengeEnablementStatus {
+  enabled: boolean
+  disabledBecause: string | null
 }
 
-export const disableOnWindowsEnv = () => {
-  return isWindows()
-}
+type SafetyModeSetting = 'enabled' | 'disabled' | 'auto'
 
-export const determineDisabledEnv = (disabledEnv: string | string[] | undefined) => {
-  if (isDocker()) {
-    return disabledEnv && (disabledEnv === 'Docker' || disabledEnv.includes('Docker')) ? 'Docker' : null
-  } else if (isHeroku()) {
-    return disabledEnv && (disabledEnv === 'Heroku' || disabledEnv.includes('Heroku')) ? 'Heroku' : null
-  } else if (isWindows()) {
-    return disabledEnv && (disabledEnv === 'Windows' || disabledEnv.includes('Windows')) ? 'Windows' : null
-  } else if (isGitpod()) {
-    return disabledEnv && (disabledEnv === 'Gitpod' || disabledEnv.includes('Gitpod')) ? 'Gitpod' : null
+type isEnvironmentFunction = () => boolean
+
+export function getChallengeEnablementStatus (challenge: Challenge,
+  safetyModeSetting: SafetyModeSetting = config.get<SafetyModeSetting>('challenges.safetyMode'),
+  isEnvironmentFunctions: {
+    isDocker: isEnvironmentFunction
+    isHeroku: isEnvironmentFunction
+    isWindows: isEnvironmentFunction
+  } = { isDocker, isHeroku, isWindows }): ChallengeEnablementStatus {
+  if (!challenge?.disabledEnv) {
+    return { enabled: true, disabledBecause: null }
   }
-  return null
+
+  if (safetyModeSetting === 'disabled') {
+    return { enabled: true, disabledBecause: null }
+  }
+
+  if (challenge.disabledEnv?.includes('Docker') && isEnvironmentFunctions.isDocker()) {
+    return { enabled: false, disabledBecause: 'Docker' }
+  }
+  if (challenge.disabledEnv?.includes('Heroku') && isEnvironmentFunctions.isHeroku()) {
+    return { enabled: false, disabledBecause: 'Heroku' }
+  }
+  if (challenge.disabledEnv?.includes('Windows') && isEnvironmentFunctions.isWindows()) {
+    return { enabled: false, disabledBecause: 'Windows' }
+  }
+  if (challenge.disabledEnv && safetyModeSetting === 'enabled') {
+    return { enabled: false, disabledBecause: 'Safety Mode' }
+  }
+
+  return { enabled: true, disabledBecause: null }
+}
+export function isChallengeEnabled (challenge: Challenge): boolean {
+  const { enabled } = getChallengeEnablementStatus(challenge)
+  return enabled
 }
 
 export const parseJsonCustom = (jsonString: string) => {
@@ -189,17 +192,13 @@ export const parseJsonCustom = (jsonString: string) => {
 }
 
 export const toSimpleIpAddress = (ipv6: string) => {
-  if (startsWith(ipv6, '::ffff:')) {
+  if (ipv6?.startsWith('::ffff:')) {
     return ipv6.substr(7)
   } else if (ipv6 === '::1') {
     return '127.0.0.1'
   } else {
     return ipv6
   }
-}
-
-export const thaw = (frozenObject: any) => {
-  return JSON.parse(JSON.stringify(frozenObject))
 }
 
 export const getErrorMessage = (error: unknown) => {
@@ -215,4 +214,35 @@ export const matchesSystemIniFile = (text: string) => {
 export const matchesEtcPasswdFile = (text: string) => {
   const match = text.match(/(\w*:\w*:\d*:\d*:\w*:.*)|(Note that this file is consulted directly)/gi)
   return match !== null && match.length >= 1
+}
+
+export function diceCoefficient (s1: string, s2: string, n = 2): number {
+  if (s1 === s2) return 1
+  if (s1.length < n || s2.length < n) return 0
+
+  const nGrams1 = new Map<string, number>()
+  for (let i = 0; i <= s1.length - n; i++) {
+    const nGram = s1.substring(i, i + n)
+    nGrams1.set(nGram, (nGrams1.get(nGram) ?? 0) + 1)
+  }
+
+  let intersectionSize = 0
+  for (let i = 0; i <= s2.length - n; i++) {
+    const nGram = s2.substring(i, i + n)
+    const count = nGrams1.get(nGram) ?? 0
+    if (count > 0) {
+      nGrams1.set(nGram, count - 1)
+      intersectionSize++
+    }
+  }
+
+  return (2.0 * intersectionSize) / (s1.length + s2.length - 2 * (n - 1))
+}
+
+/**
+ * Wrapper for asynchronous Express route handlers to ensure any rejected promises are caught and passed to the next() function.
+ * TODO: Revisit the need for this wrapper once the project is migrated to Express 5 which supports async handlers natively.
+ */
+export const asyncHandler = (fn: (req: any, res: any, next: any) => Promise<any> | any) => (req: any, res: any, next: any) => {
+  void Promise.resolve(fn(req, res, next)).catch(next)
 }

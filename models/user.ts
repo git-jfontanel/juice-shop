@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2014-2023 Bjoern Kimminich & the OWASP Juice Shop contributors.
+ * Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.
  * SPDX-License-Identifier: MIT
  */
 
-/* jslint node: true */
 import config from 'config'
 import {
   type InferAttributes,
@@ -13,10 +12,10 @@ import {
   type CreationOptional,
   type Sequelize
 } from 'sequelize'
-import challengeUtils = require('../lib/challengeUtils')
+import * as challengeUtils from '../lib/challengeUtils'
 import * as utils from '../lib/utils'
-const security = require('../lib/insecurity')
-const challenges = require('../data/datacache').challenges
+import { challenges } from '../data/datacache'
+import * as security from '../lib/insecurity'
 
 class User extends Model<
 InferAttributes<User>,
@@ -46,7 +45,7 @@ const UserModelInit = (sequelize: Sequelize) => { // vuln-code-snippet start wea
         type: DataTypes.STRING,
         defaultValue: '',
         set (username: string) {
-          if (!utils.disableOnContainerEnv()) {
+          if (utils.isChallengeEnabled(challenges.persistedXssUserChallenge)) {
             username = security.sanitizeLegacy(username)
           } else {
             username = security.sanitizeSecure(username)
@@ -58,12 +57,9 @@ const UserModelInit = (sequelize: Sequelize) => { // vuln-code-snippet start wea
         type: DataTypes.STRING,
         unique: true,
         set (email: string) {
-          if (!utils.disableOnContainerEnv()) {
+          if (utils.isChallengeEnabled(challenges.persistedXssUserChallenge)) {
             challengeUtils.solveIf(challenges.persistedXssUserChallenge, () => {
-              return utils.contains(
-                email,
-                '<iframe src="javascript:alert(`xss`)">'
-              )
+              return email?.includes('<iframe src="javascript:alert(`xss`)">') ?? false
             })
           } else {
             email = security.sanitizeSecure(email)
@@ -73,7 +69,7 @@ const UserModelInit = (sequelize: Sequelize) => { // vuln-code-snippet start wea
       }, // vuln-code-snippet hide-end
       password: {
         type: DataTypes.STRING,
-        set (clearTextPassword) {
+        set (clearTextPassword: string) {
           this.setDataValue('password', security.hash(clearTextPassword)) // vuln-code-snippet vuln-line weakPasswordChallenge
         }
       }, // vuln-code-snippet end weakPasswordChallenge
@@ -130,7 +126,7 @@ const UserModelInit = (sequelize: Sequelize) => { // vuln-code-snippet start wea
     if (
       user.email &&
     user.email.toLowerCase() ===
-      `acc0unt4nt@${config.get('application.domain')}`.toLowerCase()
+      `acc0unt4nt@${config.get<string>('application.domain')}`.toLowerCase()
     ) {
       await Promise.reject(
         new Error(

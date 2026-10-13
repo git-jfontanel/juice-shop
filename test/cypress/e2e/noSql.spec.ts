@@ -3,16 +3,16 @@ describe('/rest/products/reviews', () => {
     cy.visit('/#/search')
   })
 
-  describe('challenge "NoSQL DoS"', () => {
+  describe('challenge "noSqlCommandChallenge"', () => {
     beforeEach(() => {
       cy.login({ email: 'admin', password: 'admin123' })
     })
     it('should be possible to inject a command into the get route', () => {
-      cy.task('disableOnContainerEnv').then((disableOnContainerEnv) => {
-        if (!disableOnContainerEnv) {
+      cy.task('isDocker').then((isDocker) => {
+        if (!isDocker) {
           cy.window().then(() => {
             void fetch(
-              `${Cypress.config('baseUrl')}/rest/products/sleep(1000)/reviews`,
+              `${Cypress.config('baseUrl')}/rest/products/sleep(100)/reviews`,
               {
                 method: 'GET',
                 headers: {
@@ -27,10 +27,10 @@ describe('/rest/products/reviews', () => {
     })
   })
 
-  describe('challenge "NoSQL Exfiltration"', () => {
+  describe('challenge "noSqlOrdersChallenge"', () => {
     it('should be possible to inject and get all the orders', () => {
-      cy.task('disableOnContainerEnv').then((disableOnContainerEnv) => {
-        if (!disableOnContainerEnv) {
+      cy.task('isDocker').then((isDocker) => {
+        if (!isDocker) {
           cy.window().then(async () => {
             await fetch(
               `${Cypress.config('baseUrl')}/rest/track-order/%27%20%7C%7C%20true%20%7C%7C%20%27`,
@@ -48,7 +48,7 @@ describe('/rest/products/reviews', () => {
     })
   })
 
-  describe('challenge "NoSQL Manipulation"', () => {
+  describe('challenge "noSqlReviewsChallenge"', () => {
     beforeEach(() => {
       cy.login({ email: 'admin', password: 'admin123' })
     })
@@ -71,7 +71,7 @@ describe('/rest/products/reviews', () => {
     })
   })
 
-  describe('challenge "Forged Review"', () => {
+  describe('challenge "forgedReviewChallenge"', () => {
     beforeEach(() => {
       cy.login({ email: 'mc.safesearch', password: 'Mr. N00dles' })
     })
@@ -115,7 +115,7 @@ describe('/rest/products/reviews', () => {
     })
   })
 
-  describe('challenge "Multiple Likes"', () => {
+  describe('challenge "timingAttackChallenge"', () => {
     beforeEach(() => {
       cy.login({ email: 'mc.safesearch', password: 'Mr. N00dles' })
     })

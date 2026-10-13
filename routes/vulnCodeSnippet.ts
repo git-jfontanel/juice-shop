@@ -1,16 +1,17 @@
 /*
- * Copyright (c) 2014-2023 Bjoern Kimminich & the OWASP Juice Shop contributors.
+ * Copyright (c) 2014-2026 Bjoern Kimminich & the OWASP Juice Shop contributors.
  * SPDX-License-Identifier: MIT
  */
 
 import { type NextFunction, type Request, type Response } from 'express'
-import fs from 'fs'
 import yaml from 'js-yaml'
+import fs from 'node:fs/promises'
+
 import { getCodeChallenges } from '../lib/codingChallenges'
+import * as challengeUtils from '../lib/challengeUtils'
 import * as accuracy from '../lib/accuracy'
 import * as utils from '../lib/utils'
-
-const challengeUtils = require('../lib/challengeUtils')
+import { type ChallengeKey } from '@juice-shop/models/challenge'
 
 interface SnippetRequestBody {
   challenge: string
@@ -18,7 +19,7 @@ interface SnippetRequestBody {
 
 interface VerdictRequestBody {
   selectedLines: number[]
-  key: string
+  key: ChallengeKey
 }
 
 const setStatusCode = (error: any) => {
@@ -38,7 +39,7 @@ export const retrieveCodeSnippet = async (challengeKey: string) => {
   return null
 }
 
-exports.serveCodeSnippet = () => async (req: Request<SnippetRequestBody, Record<string, unknown>, Record<string, unknown>>, res: Response, next: NextFunction) => {
+export const serveCodeSnippet = () => async (req: Request<SnippetRequestBody, Record<string, unknown>, Record<string, unknown>>, res: Response, next: NextFunction) => {
   try {
     const snippetData = await retrieveCodeSnippet(req.params.challenge)
     if (snippetData == null) {
@@ -57,11 +58,6 @@ export const retrieveChallengesWithCodeSnippet = async () => {
   return [...codeChallenges.keys()]
 }
 
-exports.serveChallengesWithCodeSnippet = () => async (req: Request, res: Response, next: NextFunction) => {
-  const codingChallenges = await retrieveChallengesWithCodeSnippet()
-  res.json({ challenges: codingChallenges })
-}
-
 export const getVerdict = (vulnLines: number[], neutralLines: number[], selectedLines: number[]) => {
   if (selectedLines === undefined) return false
   if (vulnLines.length > selectedLines.length) return false
@@ -71,7 +67,7 @@ export const getVerdict = (vulnLines: number[], neutralLines: number[], selected
   return notOkLines.length === 0
 }
 
-exports.checkVulnLines = () => async (req: Request<Record<string, unknown>, Record<string, unknown>, VerdictRequestBody>, res: Response, next: NextFunction) => {
+export const checkVulnLines = () => async (req: Request<Record<string, unknown>, Record<string, unknown>, VerdictRequestBody>, res: Response, next: NextFunction) => {
   const key = req.body.key
   let snippetData
   try {
@@ -90,8 +86,8 @@ exports.checkVulnLines = () => async (req: Request<Record<string, unknown>, Reco
   const selectedLines: number[] = req.body.selectedLines
   const verdict = getVerdict(vulnLines, neutralLines, selectedLines)
   let hint
-  if (fs.existsSync('./data/static/codefixes/' + key + '.info.yml')) {
-    const codingChallengeInfos = yaml.load(fs.readFileSync('./data/static/codefixes/' + key + '.info.yml', 'utf8'))
+  if (await fs.stat('./data/static/codefixes/' + key + '.info.yml')) {
+    const codingChallengeInfos = yaml.load(await fs.readFile('./data/static/codefixes/' + key + '.info.yml', { encoding: 'utf8' }))
     if (codingChallengeInfos?.hints) {
       if (accuracy.getFindItAttempts(key) > codingChallengeInfos.hints.length) {
         if (vulnLines.length === 1) {

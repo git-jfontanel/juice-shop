@@ -1,4 +1,4 @@
-import { NgModule, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core'
+import { NgModule, CUSTOM_ELEMENTS_SCHEMA, inject } from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { ReactiveFormsModule, FormsModule } from '@angular/forms'
 import { RouterModule, type Routes } from '@angular/router'
@@ -10,6 +10,7 @@ import { MatButtonModule } from '@angular/material/button'
 import { MatSnackBarModule } from '@angular/material/snack-bar'
 
 import { FaucetComponent } from './faucet.component'
+import { TranslateModule } from '@ngx-translate/core'
 
 const routes: Routes = [
   {
@@ -19,21 +20,28 @@ const routes: Routes = [
 ]
 
 @NgModule({
-  declarations: [FaucetComponent],
   imports: [
     CommonModule,
     RouterModule.forChild(routes),
+    TranslateModule,
     FormsModule,
     ReactiveFormsModule,
     MatButtonModule,
     MatCardModule,
     MatInputModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    FaucetComponent
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class FaucetModule {
-  constructor (public configurationService: ConfigurationService, public overlayContainer: OverlayContainer) {
+  configurationService = inject(ConfigurationService)
+  overlayContainer = inject(OverlayContainer)
+
+  constructor () {
+    const configurationService = this.configurationService
+    const overlayContainer = this.overlayContainer
+
     configurationService.getApplicationConfiguration().subscribe((conf) => {
       overlayContainer.getContainerElement().classList.add(conf.application.theme + '-theme')
     })
